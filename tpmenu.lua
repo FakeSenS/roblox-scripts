@@ -11,11 +11,7 @@ local MenuEnabled = true
 local AutoRefreshLoop = true
 local ESP_Enabled = false
 local AFK_Enabled = false
-local Bhop_Enabled = false
-local AFK_Speed = 3 -- 默认转圈速度
-
--- 连跳变量
-local isSpaceHeld = false
+local AFK_Speed = 3 -- 默认初始速度
 
 -- GUI主容器
 local SG = Instance.new("ScreenGui")
@@ -25,9 +21,9 @@ SG.ResetOnSpawn = false
 SG.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 SG.IgnoreGuiInset = true
 
--- 主窗口 重新规划尺寸
+-- 主窗口
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 260, 0, 505)
+MainFrame.Size = UDim2.new(0, 260, 0, 480)
 MainFrame.Position = UDim2.new(0.03, 0, 0.12, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15,15,15)
 MainFrame.BorderSizePixel = 1
@@ -38,45 +34,82 @@ MainFrame.Visible = true
 local TitleLab = Instance.new("TextLabel")
 TitleLab.Size = UDim2.new(1,0,0,28)
 TitleLab.BackgroundTransparency = 1
-TitleLab.Text = "🎮 传送菜单 | ESP | 挂机 | 连跳"
+TitleLab.Text = "🎮 多功能菜单"
 TitleLab.TextColor3 = Color3.new(1,1,1)
 TitleLab.Font = Enum.Font.SourceSansBold
 TitleLab.TextSize = 14
 TitleLab.Parent = MainFrame
 
--- ========== 上半区：搜索 + 刷新 + 玩家TP列表 ==========
+-- ========== 分页标签按钮 ==========
+local TabTP = Instance.new("TextButton")
+TabTP.Size = UDim2.new(0.48,0,0,26)
+TabTP.Position = UDim2.new(0.01,0,0,30)
+TabTP.BackgroundColor3 = Color3.fromRGB(30,60,30)
+TabTP.Text = "📡 传送玩家"
+TabTP.TextColor3 = Color3.new(1,1,1)
+TabTP.Font = Enum.Font.SourceSansBold
+TabTP.TextSize = 12
+TabTP.Parent = MainFrame
+
+local TabFunc = Instance.new("TextButton")
+TabFunc.Size = UDim2.new(0.48,0,0,26)
+TabFunc.Position = UDim2.new(0.51,0,0,30)
+TabFunc.BackgroundColor3 = Color3.fromRGB(30,30,30)
+TabFunc.Text = "⚙️ 功能设置"
+TabFunc.TextColor3 = Color3.new(1,1,1)
+TabFunc.Font = Enum.Font.SourceSansBold
+TabFunc.TextSize = 12
+TabFunc.Parent = MainFrame
+
+-- ========== 页面容器 ==========
+-- 传送页面（独立单独一页）
+local PageTP = Instance.new("Frame")
+PageTP.Size = UDim2.new(0.98,0,0.82,0)
+PageTP.Position = UDim2.new(0.01,0,0,60)
+PageTP.BackgroundTransparency = 1
+PageTP.Parent = MainFrame
+
+-- 功能设置页面
+local PageFunc = Instance.new("Frame")
+PageFunc.Size = UDim2.new(0.98,0,0.82,0)
+PageFunc.Position = UDim2.new(0.01,0,0,60)
+PageFunc.BackgroundTransparency = 1
+PageFunc.Visible = false
+PageFunc.Parent = MainFrame
+
+-- ========== 传送页内容：搜索 + 刷新 + 独立TP列表 ==========
 -- 搜索框
 local SearchBox = Instance.new("TextBox")
 SearchBox.Size = UDim2.new(0.72,0,0,24)
-SearchBox.Position = UDim2.new(0.04,0,0,32)
+SearchBox.Position = UDim2.new(0.04,0,0,0)
 SearchBox.BackgroundColor3 = Color3.fromRGB(30,30,30)
 SearchBox.PlaceholderText = "🔍 搜索玩家..."
 SearchBox.Text = ""
 SearchBox.TextColor3 = Color3.new(1,1,1)
 SearchBox.Font = Enum.Font.SourceSans
 SearchBox.TextSize = 12
-SearchBox.Parent = MainFrame
+SearchBox.Parent = PageTP
 
 -- 刷新按钮
 local RefreshBtn = Instance.new("TextButton")
 RefreshBtn.Size = UDim2.new(0,55,0,24)
-RefreshBtn.Position = UDim2.new(0.78,0,0,32)
+RefreshBtn.Position = UDim2.new(0.78,0,0,0)
 RefreshBtn.BackgroundColor3 = Color3.fromRGB(35,35,35)
 RefreshBtn.Text = "刷新"
 RefreshBtn.TextColor3 = Color3.new(1,1,1)
 RefreshBtn.Font = Enum.Font.SourceSans
 RefreshBtn.TextSize = 12
-RefreshBtn.Parent = MainFrame
+RefreshBtn.Parent = PageTP
 
--- 滚动列表 TP区域
+-- 传送专属滚动列表
 local ScrollFrame = Instance.new("ScrollingFrame")
-ScrollFrame.Size = UDim2.new(0.94,0,0.50,0)
-ScrollFrame.Position = UDim2.new(0.03,0,0,60)
+ScrollFrame.Size = UDim2.new(0.94,0,0.88,0)
+ScrollFrame.Position = UDim2.new(0.03,0,0,28)
 ScrollFrame.BackgroundColor3 = Color3.fromRGB(22,22,22)
 ScrollFrame.CanvasSize = UDim2.new(0,0,0,0)
 ScrollFrame.ScrollBarThickness = 4
 ScrollFrame.BorderSizePixel = 0
-ScrollFrame.Parent = MainFrame
+ScrollFrame.Parent = PageTP
 
 local UIList = Instance.new("UIListLayout")
 UIList.Padding = UDim.new(0,2)
@@ -90,94 +123,73 @@ local function UpdateCanvasSize()
 end
 UIList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(UpdateCanvasSize)
 
--- ========== 下半区：功能设置区域 ==========
-local FuncLabel = Instance.new("TextLabel")
-FuncLabel.Size = UDim2.new(1,0,0,22)
-FuncLabel.Position = UDim2.new(0,0,0.51,0)
-FuncLabel.BackgroundTransparency = 1
-FuncLabel.Text = "⚙️ 功能设置区"
-FuncLabel.TextColor3 = Color3.fromRGB(120,180,255)
-FuncLabel.Font = Enum.Font.SourceSansBold
-FuncLabel.TextSize = 13
-FuncLabel.Parent = MainFrame
-
+-- ========== 功能设置页内容 ==========
 -- ESP开关
 local ESP_ToggleBtn = Instance.new("TextButton")
 ESP_ToggleBtn.Size = UDim2.new(0.94,0,0,22)
-ESP_ToggleBtn.Position = UDim2.new(0.03,0,0.56,0)
+ESP_ToggleBtn.Position = UDim2.new(0.03,0,0.05,0)
 ESP_ToggleBtn.BackgroundColor3 = Color3.fromRGB(25,45,25)
 ESP_ToggleBtn.Text = "❌ ESP 已关闭"
 ESP_ToggleBtn.TextColor3 = Color3.new(1,1,1)
 ESP_ToggleBtn.Font = Enum.Font.SourceSansBold
 ESP_ToggleBtn.TextSize = 12
-ESP_ToggleBtn.Parent = MainFrame
+ESP_ToggleBtn.Parent = PageFunc
 
 -- 原地转圈开关
 local AFK_ToggleBtn = Instance.new("TextButton")
 AFK_ToggleBtn.Size = UDim2.new(0.94,0,0,22)
-AFK_ToggleBtn.Position = UDim2.new(0.03,0,0.62,0)
+AFK_ToggleBtn.Position = UDim2.new(0.03,0,0.15,0)
 AFK_ToggleBtn.BackgroundColor3 = Color3.fromRGB(45,45,25)
 AFK_ToggleBtn.Text = "❌ 挂机转圈 关闭"
 AFK_ToggleBtn.TextColor3 = Color3.new(1,1,1)
 AFK_ToggleBtn.Font = Enum.Font.SourceSansBold
 AFK_ToggleBtn.TextSize = 12
-AFK_ToggleBtn.Parent = MainFrame
-
--- 自动连跳开关
-local Bhop_ToggleBtn = Instance.new("TextButton")
-Bhop_ToggleBtn.Size = UDim2.new(0.94,0,0,22)
-Bhop_ToggleBtn.Position = UDim2.new(0.03,0,0.68,0)
-Bhop_ToggleBtn.BackgroundColor3 = Color3.fromRGB(25,45,55)
-Bhop_ToggleBtn.Text = "❌ 自动连跳 关闭"
-Bhop_ToggleBtn.TextColor3 = Color3.new(1,1,1)
-Bhop_ToggleBtn.Font = Enum.Font.SourceSansBold
-Bhop_ToggleBtn.TextSize = 12
-Bhop_ToggleBtn.Parent = MainFrame
+AFK_ToggleBtn.Parent = PageFunc
 
 -- 转圈速度文字提示
 local SpeedTip = Instance.new("TextLabel")
 SpeedTip.Size = UDim2.new(0.45,0,0,22)
-SpeedTip.Position = UDim2.new(0.03,0,0.74,0)
+SpeedTip.Position = UDim2.new(0.03,0,0.25,0)
 SpeedTip.BackgroundTransparency = 1
 SpeedTip.Text = "转圈速度："
 SpeedTip.TextColor3 = Color3.new(1,1,1)
 SpeedTip.Font = Enum.Font.SourceSans
 SpeedTip.TextSize = 12
-SpeedTip.Parent = MainFrame
+SpeedTip.Parent = PageFunc
 
 -- 自定义速度输入框
 local SpeedInput = Instance.new("TextBox")
 SpeedInput.Size = UDim2.new(0.45,0,0,22)
-SpeedInput.Position = UDim2.new(0.52,0,0.74,0)
+SpeedInput.Position = UDim2.new(0.52,0,0.25,0)
 SpeedInput.BackgroundColor3 = Color3.fromRGB(30,30,30)
 SpeedInput.Text = tostring(AFK_Speed)
 SpeedInput.PlaceholderText = "输入数字"
 SpeedInput.TextColor3 = Color3.new(0,1,0)
 SpeedInput.Font = Enum.Font.SourceSans
 SpeedInput.TextSize = 12
-SpeedInput.Parent = MainFrame
+SpeedInput.Parent = PageFunc
 
 -- 收起菜单
 local CloseMenuBtn = Instance.new("TextButton")
 CloseMenuBtn.Size = UDim2.new(0.94,0,0,22)
-CloseMenuBtn.Position = UDim2.new(0.03,0,0.80,0)
+CloseMenuBtn.Position = UDim2.new(0.03,0,0.35,0)
 CloseMenuBtn.BackgroundColor3 = Color3.fromRGB(45,25,25)
 CloseMenuBtn.Text = "📕 收起菜单"
 CloseMenuBtn.TextColor3 = Color3.new(1,1,1)
 CloseMenuBtn.Font = Enum.Font.SourceSansBold
 CloseMenuBtn.TextSize = 12
-CloseMenuBtn.Parent = MainFrame
+CloseMenuBtn.Parent = PageFunc
 
 -- 关闭脚本
 local DisableScriptBtn = Instance.new("TextButton")
 DisableScriptBtn.Size = UDim2.new(0.94,0,0,22)
-DisableScriptBtn.Position = UDim2.new(0.03,0,0.86,0)
+DisableScriptBtn.Position = UDim2.new(0.03,0,0.45,0)
 DisableScriptBtn.BackgroundColor3 = Color3.fromRGB(60,15,15)
 DisableScriptBtn.Text = "❌ 彻底关闭脚本"
 DisableScriptBtn.TextColor3 = Color3.new(1,1,1)
 DisableScriptBtn.Font = Enum.Font.SourceSansBold
 DisableScriptBtn.TextSize = 12
-DisableScriptBtn.Parent = MainFrame
+DisableScriptBtn.Parent = PageFunc
 
 -- 展开悬浮按钮
 local OpenMenuBtn = Instance.new("TextButton")
@@ -190,6 +202,23 @@ OpenMenuBtn.Font = Enum.Font.SourceSansBold
 OpenMenuBtn.TextSize = 12
 OpenMenuBtn.Visible = false
 OpenMenuBtn.Parent = SG
+
+-- ========== 分页切换逻辑 ==========
+local function SwitchTab(isTP)
+	if isTP then
+		PageTP.Visible = true
+		PageFunc.Visible = false
+		TabTP.BackgroundColor3 = Color3.fromRGB(30,60,30)
+		TabFunc.BackgroundColor3 = Color3.fromRGB(30,30,30)
+	else
+		PageTP.Visible = false
+		PageFunc.Visible = true
+		TabTP.BackgroundColor3 = Color3.fromRGB(30,30,30)
+		TabFunc.BackgroundColor3 = Color3.fromRGB(30,60,30)
+	end
+end
+TabTP.MouseButton1Click:Connect(function() SwitchTab(true) end)
+TabFunc.MouseButton1Click:Connect(function() SwitchTab(false) end)
 
 -- 传送函数
 local function TeleportToPlayer(targetPlr)
@@ -274,7 +303,6 @@ DisableScriptBtn.MouseButton1Click:Connect(function()
 	AutoRefreshLoop = false
 	ESP_Enabled = false
 	AFK_Enabled = false
-	Bhop_Enabled = false
 	SG:Destroy()
 	print("❌ 所有功能已终止")
 end)
@@ -303,18 +331,6 @@ AFK_ToggleBtn.MouseButton1Click:Connect(function()
 	end
 end)
 
--- 连跳开关
-Bhop_ToggleBtn.MouseButton1Click:Connect(function()
-	Bhop_Enabled = not Bhop_Enabled
-	if Bhop_Enabled then
-		Bhop_ToggleBtn.Text = "✅ 自动连跳 开启"
-		Bhop_ToggleBtn.BackgroundColor3 = Color3.fromRGB(25,60,80)
-	else
-		Bhop_ToggleBtn.Text = "❌ 自动连跳 关闭"
-		Bhop_ToggleBtn.BackgroundColor3 = Color3.fromRGB(25,45,55)
-	end
-end)
-
 -- 刷新、搜索
 RefreshBtn.MouseButton1Click:Connect(RefreshPlayerList)
 SearchBox:GetPropertyChangedSignal("Text"):Connect(RefreshPlayerList)
@@ -325,33 +341,6 @@ UIS.InputBegan:Connect(function(inp,processed)
 	if inp.KeyCode == Enum.KeyCode.M then
 		MainFrame.Visible = not MainFrame.Visible
 		OpenMenuBtn.Visible = not MainFrame.Visible
-	end
-end)
-
--- 监听空格长按
-UIS.InputBegan:Connect(function(input, processed)
-	if processed then return end
-	if input.KeyCode == Enum.KeyCode.Space then
-		isSpaceHeld = true
-	end
-end)
-
-UIS.InputEnded:Connect(function(input)
-	if input.KeyCode == Enum.KeyCode.Space then
-		isSpaceHeld = false
-	end
-end)
-
--- 自动连跳逻辑 完美兔子跳
-RunService.Heartbeat:Connect(function()
-	if not Bhop_Enabled or not isSpaceHeld then return end
-	local char = LocalPlayer.Character
-	if not char then return end
-	local hum = char:FindFirstChild("Humanoid")
-	if not hum then return end
-
-	if hum.FloorMaterial ~= Enum.Material.Air then
-		hum:Jump()
 	end
 end)
 
@@ -417,6 +406,7 @@ RunService.Heartbeat:Connect(function(delta)
 	hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(AFK_Speed * delta * 60), 0)
 end)
 
--- 初始化
+-- 初始化默认打开传送分页
+SwitchTab(true)
 RefreshPlayerList()
-print("✅ 传送+ESP+挂机转圈+长按空格完美连跳 已加载")
+print("✅ 已重构：传送菜单独立分页 | M键开关")
