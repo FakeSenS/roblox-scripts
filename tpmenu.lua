@@ -68,7 +68,7 @@ CloseMenuBtn.Position = UDim2.new(0,5,0,56)
 CloseMenuBtn.BackgroundColor3 = Color3.fromRGB(45,25,25)
 CloseMenuBtn.Text = "📕 收起菜单"
 CloseMenuBtn.TextColor3 = Color3.new(1,1,1)
-CloseMenuBtn.Font = Enum.Font.SourceSans
+CloseMenuBtn.Font = Enum.Font.SourceSansBold
 CloseMenuBtn.TextSize = 12
 CloseMenuBtn.Parent = MainFrame
 
@@ -83,7 +83,7 @@ DisableScriptBtn.Font = Enum.Font.SourceSansBold
 DisableScriptBtn.TextSize = 12
 DisableScriptBtn.Parent = MainFrame
 
--- 新增 ESP 开关按钮
+-- ESP 开关按钮
 local ESP_ToggleBtn = Instance.new("TextButton")
 ESP_ToggleBtn.Size = UDim2.new(1,-10,0,22)
 ESP_ToggleBtn.Position = UDim2.new(0,5,0,106)
@@ -247,86 +247,68 @@ task.spawn(function()
 	end
 end)
 
--- ===================== ESP 透视核心 =====================
-local ESP_Objects = {}
+-- ============== 重写 可用ESP 核心（修复无效问题） ==============
+local espCache = {}
 
-local function CreateESP(plr)
-	local holder = Instance.new("Folder")
-	holder.Name = "ESP_"..plr.Name
-	holder.Parent = PlayerGui
-
-	-- 名字+距离文字
-	local NameTag = Instance.new("TextLabel")
-	NameTag.Size = UDim2.new(0,100,0,20)
-	NameTag.BackgroundTransparency = 1
-	NameTag.TextColor3 = Color3.new(1,1,0)
-	NameTag.Font = Enum.Font.SourceSansBold
-	NameTag.TextSize = 14
-	NameTag.Parent = holder
-
-	-- 方框容器
-	local BoxFrame = Instance.new("Frame")
-	BoxFrame.Size = UDim2.new(0,0,0,0)
-	BoxFrame.BackgroundTransparency = 1
-	BoxFrame.BorderColor3 = Color3.new(0,1,0)
-	BoxFrame.BorderSizePixel = 2
-	BoxFrame.Parent = holder
-
-	ESP_Objects[plr] = {Holder=holder, NameTag=NameTag, Box=BoxFrame}
-end
-
-local function RemoveESP(plr)
-	if ESP_Objects[plr] then
-		ESP_Objects[plr].Holder:Destroy()
-		ESP_Objects[plr] = nil
-	end
-end
-
--- 每帧渲染ESP
+-- 每帧渲染 ESP
 RunService.RenderStepped:Connect(function()
 	if not ESP_Enabled then
-		for _,v in pairs(ESP_Objects) do
-			v.Holder:Destroy()
+		for _,v in pairs(espCache) do
+			if v.Main then v.Main:Destroy() end
 		end
-		table.clear(ESP_Objects)
+		espCache = {}
 		return
 	end
 
-	for _,plr in ipairs(Players:GetPlayers()) do
-		if plr ~= LocalPlayer then
-			local char = plr.Character
-			if not char then RemoveESP(plr) continue end
-			local hrp = char:FindFirstChild("HumanoidRootPart")
-			local hum = char:FindFirstChild("Humanoid")
-			if not hrp or not hum then RemoveESP(plr) continue end
-
-			if not ESP_Objects[plr] then CreateESP(plr) end
-			local esp = ESP_Objects[plr]
-
-			-- 计算距离
-			local dist = math.floor((Camera.CFrame.Position - hrp.Position).Magnitude)
-			esp.NameTag.Text = plr.Name .. " | " .. dist .. "m"
-
-			-- 头顶名字位置
-			local headPos,vis = Camera:WorldToViewportPoint(char.Head.Position + Vector3.new(0,1.5,0))
-			esp.NameTag.Position = UDim2.new(0,headPos.X-50,0,headPos.Y-10)
-			esp.NameTag.Visible = vis
-
-			-- 玩家方框
-			local top = Camera:WorldToViewportPoint(char.Head.Position + Vector3.new(0,0.5,0))
-			local bottom = Camera:WorldToViewportPoint(char.HumanoidRootPart.Position - Vector3.new(0,1,0))
-			esp.Box.Position = UDim2.new(0, top.X-25, 0, top.Y)
-			esp.Box.Size = UDim2.new(0,50,0, bottom.Y - top.Y)
-			esp.Box.Visible = vis
+	for _,plr in Players:GetPlayers() do
+		if plr == LocalPlayer then continue end
+		local char = plr.Character
+		if not char or not char:FindFirstChild("Head") or not char:FindFirstChild("HumanoidRootPart") then
+			if espCache[plr] then
+				espCache[plr].Main:Destroy()
+				espCache[plr] = nil
+			end
+			continue
 		end
+
+		-- 没有就创建ESP
+		if not espCache[plr] then
+			local holder = Instance.new("Folder")
+			holder.Name = "ESP_"..plr.Name
+			holder.Parent = SG
+
+			local label = Instance.new("TextLabel")
+			label.BackgroundTransparency = 1
+			label.TextColor3 = Color3.new(1,1,0)
+			label.Font = Enum.Font.SourceSansBold
+			label.TextSize = 15
+			label.Parent = holder
+
+			espCache[plr] = {Main = holder, Label = label}
+		end
+
+		local head = char.Head
+		local hrp = char.HumanoidRootPart
+		local data = espCache[plr]
+
+		-- 头顶名字+距离
+		local dist = math.floor((Camera.CFrame.Position - hrp.Position).Magnitude)
+		data.Label.Text = plr.Name .. " | " .. dist .. "m"
+
+		local pos, vis = Camera:WorldToViewportPoint(head.Position + Vector3.new(0,1,0))
+		data.Label.Position = UDim2.new(0, pos.X - 40, 0, pos.Y - 15)
+		data.Label.Visible = vis
 	end
 end)
 
--- 玩家离开清理ESP
+-- 玩家离开清理
 Players.PlayerRemoving:Connect(function(plr)
-	RemoveESP(plr)
+	if espCache[plr] then
+		espCache[plr].Main:Destroy()
+		espCache[plr] = nil
+	end
 end)
 
 -- 初始化
 RefreshPlayerList()
-print("✅ 传送菜单+ESP加载完成 | M键开关菜单")
+print("✅ 传送菜单+ESP 加载完成")
